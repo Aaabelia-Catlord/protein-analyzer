@@ -16,6 +16,7 @@ Give it a sequence (typed in, or from a FASTA file) and it reports:
 | **Extinction coefficient (280 nm)** | Trp, Tyr and cystine contributions (Pace et al., 1995), for use with the Beer–Lambert law |
 | **GRAVY score** | Average Kyte–Doolittle hydropathy |
 | **Amino acid composition** | Count and percentage of each residue |
+| **Titration curve** | Net charge from pH 0 to 14, plotted with matplotlib and saved as an image |
 
 ## Example
 
@@ -39,6 +40,12 @@ You can also pass a sequence directly:
 python -m protein_analyzer MQIFVKTLTGKTITLEVEPSDTIENVK
 ```
 
+## Titration curve
+
+python -m protein_analyzer --fasta examples/ubiquitin.fasta --plot titration_curve.png
+
+![Titration curve of ubiquitin](titration_curve.png)
+
 ## Getting started
 
 Requires Python 3.10+.
@@ -46,7 +53,7 @@ Requires Python 3.10+.
 ```
 git clone https://github.com/Aaabelia-Catlord/protein-analyzer.git
 cd protein-analyzer
-pip install -r requirements.txt   # only needed to run the tests
+pip install -r requirements.txt   # installs pytest and matplotlib
 python -m protein_analyzer --fasta examples/ubiquitin.fasta
 ```
 
@@ -64,6 +71,7 @@ protein_analyzer/
     sequence.py    # ProteinSequence class with all calculations
     fasta.py       # FASTA file parsing
     cli.py         # command-line interface (argparse)
+    plot.py        # titration curve plotting (matplotlib)
 tests/             # pytest unit tests
 examples/          # sample FASTA file
 ```
