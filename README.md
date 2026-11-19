@@ -44,7 +44,7 @@ python -m protein_analyzer MQIFVKTLTGKTITLEVEPSDTIENVK
 Requires Python 3.10+.
 
 ```
-git clone https://github.com/<your-username>/protein-analyzer.git
+git clone https://github.com/Aaabelia-Catlord/protein-analyzer.git
 cd protein-analyzer
 pip install -r requirements.txt   # only needed to run the tests
 python -m protein_analyzer --fasta examples/ubiquitin.fasta
