@@ -3,6 +3,7 @@
 Examples:
     python -m protein_analyzer MQIFVKTLTGK
     python -m protein_analyzer --fasta examples/ubiquitin.fasta --ph 7.4
+    python -m protein_analyzer --uniprot P01308
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import sys
 
 from protein_analyzer.fasta import read_fasta
 from protein_analyzer.sequence import ProteinSequence
+from protein_analyzer.uniprot import UniProtError, fetch_by_accession
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,6 +29,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     source.add_argument(
         "--fasta", metavar="FILE", help="path to a FASTA file",
+    )
+    source.add_argument(
+        "--uniprot", metavar="ID",
+        help="download a protein from UniProt by accession (e.g. P01308)",
     )
     parser.add_argument(
         "--ph", type=float, default=7.0,
@@ -50,9 +56,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.fasta:
             proteins = read_fasta(args.fasta)
+        elif args.uniprot:
+            proteins = [fetch_by_accession(args.uniprot)]
         else:
             proteins = [ProteinSequence(args.sequence)]
-    except (ValueError, OSError) as error:
+    except (ValueError, OSError, UniProtError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
