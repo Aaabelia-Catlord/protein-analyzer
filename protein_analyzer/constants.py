@@ -44,3 +44,12 @@ HYDROPATHY: dict[str, float] = {
 TRP_EXTINCTION: int = 5500
 TYR_EXTINCTION: int = 1490
 CYSTINE_EXTINCTION: int = 125  # per disulfide bond (pair of cysteines)
+
+# Full names of the amino acids, for reports.
+AMINO_ACID_NAMES: dict[str, str] = {
+    "A": "Alanine", "R": "Arginine", "N": "Asparagine", "D": "Aspartate",
+    "C": "Cysteine", "E": "Glutamate", "Q": "Glutamine", "G": "Glycine",
+    "H": "Histidine", "I": "Isoleucine", "L": "Leucine", "K": "Lysine",
+    "M": "Methionine", "F": "Phenylalanine", "P": "Proline", "S": "Serine",
+    "T": "Threonine", "W": "Tryptophan", "Y": "Tyrosine", "V": "Valine",
+}

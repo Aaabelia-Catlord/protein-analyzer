@@ -16,6 +16,7 @@ from protein_analyzer.fasta import parse_fasta
 from protein_analyzer.sequence import ProteinSequence
 
 BASE_URL = "https://rest.uniprot.org/uniprotkb"
+WEBSITE_URL = "https://www.uniprot.org/uniprotkb"
 TIMEOUT_SECONDS = 15
 
 # The official format of a UniProt accession (ID), from UniProt's docs.
@@ -69,7 +70,7 @@ def fetch_by_accession(accession: str) -> ProteinSequence:
         # e.g. the sequence has selenocysteine (U), which we don't support.
         raise UniProtError(f"Can't analyze {accession}: {error}") from error
 
-    protein.name = short_name(protein.name)
+    _add_uniprot_details(protein)
     return protein
 
 
@@ -106,7 +107,7 @@ def fetch_by_gene(gene: str, organism: str = "human"
 
     proteins = []
     for protein in parse_fasta_safely(text):
-        protein.name = short_name(protein.name)
+        _add_uniprot_details(protein)
         proteins.append(protein)
     if not proteins:
         raise UniProtError(f"Can't analyze any protein for gene '{gene}'.")
@@ -158,15 +159,34 @@ def _try_parse(record: str) -> list[ProteinSequence]:
         return []
 
 
+def _add_uniprot_details(protein: ProteinSequence) -> None:
+    """Give a protein downloaded from UniProt a short name and a link.
+
+    Before this, protein.name is the full FASTA header.
+    """
+    accession = accession_from_header(protein.name)
+    protein.source = f"{WEBSITE_URL}/{accession}"
+    protein.name = short_name(protein.name)
+
+
+def accession_from_header(header: str) -> str:
+    """Return the accession from a UniProt FASTA header.
+
+    >>> accession_from_header("sp|P01308|INS_HUMAN Insulin OS=Homo sapiens")
+    'P01308'
+    """
+    ids = header.split(" ")[0].split("|")
+    return ids[1] if len(ids) >= 2 else ids[0]
+
+
 def short_name(header: str) -> str:
     """Turn a long UniProt FASTA header into a readable name.
 
     >>> short_name("sp|P01308|INS_HUMAN Insulin OS=Homo sapiens OX=9606 GN=INS")
     'Insulin (P01308, Homo sapiens)'
     """
-    ids, _, rest = header.partition(" ")
-    parts = ids.split("|")
-    accession = parts[1] if len(parts) >= 2 else ids
+    accession = accession_from_header(header)
+    rest = header.partition(" ")[2]
 
     description = rest.split(" OS=")[0].strip() or accession
     organism = re.search(r"OS=(.+?)(?: [A-Z]{2}=|$)", rest)

@@ -17,6 +17,8 @@ Give it a sequence (typed in, or from a FASTA file) and it reports:
 | **GRAVY score** | Average Kyte–Doolittle hydropathy |
 | **Amino acid composition** | Count and percentage of each residue |
 | **Titration curve** | Net charge from pH 0 to 14, plotted with matplotlib and saved as an image |
+| **UniProt download** | Fetch any protein by accession (`--uniprot P01308`) or gene name and organism (`--gene INS --organism human`) using the UniProt REST API |
+| **Markdown report** | One command creates a report with all properties, a composition table, the formatted sequence and a titration curve (`--report`) |
 
 ## Example
 
@@ -46,6 +48,21 @@ python -m protein_analyzer --fasta examples/ubiquitin.fasta --plot titration_cur
 
 ![Titration curve of ubiquitin](titration_curve.png)
 
+## Pipeline: gene name → report
+
+```
+python -m protein_analyzer --gene INS --report examples/insulin_report.md
+```
+
+This searches UniProt for the reviewed human insulin entry, runs the analysis, plots the titration curve and saves a report. See the [example report](examples/insulin_report.md).
+
+Other examples:
+
+```
+python -m protein_analyzer --uniprot P69905
+python -m protein_analyzer --gene Ins2 --organism mouse
+```
+
 ## Getting started
 
 Requires Python 3.10+.
@@ -72,6 +89,8 @@ protein_analyzer/
     fasta.py       # FASTA file parsing
     cli.py         # command-line interface (argparse)
     plot.py        # titration curve plotting (matplotlib)
+    uniprot.py     # downloading proteins from the UniProt REST API
+    report.py      # Markdown report generation
 tests/             # pytest unit tests
 examples/          # sample FASTA file
 ```

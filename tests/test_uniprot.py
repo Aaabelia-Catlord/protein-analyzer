@@ -55,6 +55,7 @@ def test_fetch_returns_protein(fake_download: list[str]) -> None:
     assert len(protein) == 110
     assert protein.residues.startswith("MALWMRLL")
     assert protein.name == "Insulin (P01308, Homo sapiens)"
+    assert protein.source == "https://www.uniprot.org/uniprotkb/P01308"
 
 
 def test_invalid_accession_does_not_download(fake_download: list[str]) -> None:

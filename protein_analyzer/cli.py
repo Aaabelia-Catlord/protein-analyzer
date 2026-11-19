@@ -5,6 +5,7 @@ Examples:
     python -m protein_analyzer --fasta examples/ubiquitin.fasta --ph 7.4
     python -m protein_analyzer --uniprot P01308
     python -m protein_analyzer --gene INS --organism mouse
+    python -m protein_analyzer --gene INS --report insulin_report.md
 """
 
 from __future__ import annotations
@@ -56,6 +57,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--plot", metavar="IMAGE",
         help="save a titration curve to this file (e.g. curve.png)",
     )
+    parser.add_argument(
+        "--report", metavar="FILE",
+        help="save a Markdown report (e.g. report.md) with a titration curve",
+    )
     return parser
 
 
@@ -96,4 +101,13 @@ def main(argv: list[str] | None = None) -> int:
         from protein_analyzer.plot import plot_titration_curves
         plot_titration_curves(proteins, args.plot)
         print(f"\nTitration curve saved to {args.plot}")
+
+    if args.report:
+        from protein_analyzer.report import write_report
+        try:
+            image = write_report(proteins, args.report, args.ph)
+        except OSError as error:
+            print(f"Error: couldn't save report: {error}", file=sys.stderr)
+            return 1
+        print(f"\nReport saved to {args.report} (graph: {image})")
     return 0

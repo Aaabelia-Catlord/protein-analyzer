@@ -25,6 +25,8 @@ class ProteinSequence:
     Attributes:
         name: A label for the protein (for example, a FASTA header).
         residues: The sequence in uppercase one-letter codes.
+        source: A link to where the sequence came from (e.g. its UniProt
+            page), or None if it was typed in or read from a file.
 
     >>> protein = ProteinSequence("gg")
     >>> protein.residues
@@ -35,6 +37,7 @@ class ProteinSequence:
 
     name: str
     residues: str
+    source: str | None
 
     def __init__(self, residues: str, name: str = "unnamed") -> None:
         """Create a protein from a sequence string.
@@ -57,6 +60,7 @@ class ProteinSequence:
 
         self.residues = cleaned
         self.name = name
+        self.source = None
         self._counts = Counter(cleaned)
 
     def __len__(self) -> int:
