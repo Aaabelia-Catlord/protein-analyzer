@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 
 from protein_analyzer.sequence import ProteinSequence
 
@@ -27,7 +27,8 @@ def plot_titration_curves(proteins: list[ProteinSequence],
 
     Each protein's pI (where the curve crosses zero) is marked with a dot.
     """
-    fig, ax = plt.subplots(figsize=(7, 4.5))
+    fig = Figure(figsize=(7, 4.5))
+    ax = fig.subplots()
 
     for protein in proteins:
         phs, charges = titration_points(protein)
@@ -46,4 +47,3 @@ def plot_titration_curves(proteins: list[ProteinSequence],
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
-    plt.close(fig)

@@ -4,6 +4,7 @@ Examples:
     python -m protein_analyzer MQIFVKTLTGK
     python -m protein_analyzer --fasta examples/ubiquitin.fasta --ph 7.4
     python -m protein_analyzer --uniprot P01308
+    python -m protein_analyzer --gene INS --organism mouse
 """
 
 from __future__ import annotations
@@ -13,7 +14,11 @@ import sys
 
 from protein_analyzer.fasta import read_fasta
 from protein_analyzer.sequence import ProteinSequence
-from protein_analyzer.uniprot import UniProtError, fetch_by_accession
+from protein_analyzer.uniprot import (
+    UniProtError,
+    fetch_by_accession,
+    fetch_by_gene,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -34,6 +39,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--uniprot", metavar="ID",
         help="download a protein from UniProt by accession (e.g. P01308)",
     )
+    source.add_argument(
+        "--gene", metavar="NAME",
+        help="search UniProt by gene name (e.g. INS, HBB, TP53)",
+    )
+    parser.add_argument(
+        "--organism", metavar="NAME",
+        help="organism for --gene: human (default), mouse, rat, zebrafish, "
+             "fly, worm, yeast, ecoli, or a taxonomy ID",
+    )
     parser.add_argument(
         "--ph", type=float, default=7.0,
         help="pH for the net-charge calculation (default: 7.0)",
@@ -52,12 +66,22 @@ def main(argv: list[str] | None = None) -> int:
     if not 0 <= args.ph <= 14:
         print("Error: pH must be between 0 and 14.", file=sys.stderr)
         return 1
+    if args.organism and not args.gene:
+        print("Error: --organism only works with --gene.", file=sys.stderr)
+        return 1
 
     try:
         if args.fasta:
             proteins = read_fasta(args.fasta)
         elif args.uniprot:
             proteins = [fetch_by_accession(args.uniprot)]
+        elif args.gene:
+            matches = fetch_by_gene(args.gene, args.organism or "human")
+            proteins = [matches[0]]
+            if len(matches) > 1:
+                others = ", ".join(protein.name for protein in matches[1:])
+                print(f"Note: {len(matches) - 1} other match(es) found: "
+                      f"{others}. Showing the first one.\n", file=sys.stderr)
         else:
             proteins = [ProteinSequence(args.sequence)]
     except (ValueError, OSError, UniProtError) as error:

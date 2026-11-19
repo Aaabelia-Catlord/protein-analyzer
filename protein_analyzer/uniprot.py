@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from protein_analyzer.fasta import parse_fasta
@@ -22,6 +23,22 @@ TIMEOUT_SECONDS = 15
 ACCESSION_PATTERN = re.compile(
     r"^([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})$"
 )
+
+
+# Common names for organisms, mapped to their NCBI taxonomy IDs.
+# Users can also type any taxonomy ID directly (e.g. 9913 for cow).
+ORGANISMS: dict[str, int] = {
+    "human": 9606,
+    "mouse": 10090,
+    "rat": 10116,
+    "zebrafish": 7955,
+    "fly": 7227,      # Drosophila melanogaster
+    "worm": 6239,     # Caenorhabditis elegans
+    "yeast": 559292,  # Saccharomyces cerevisiae (strain S288c)
+    "ecoli": 83333,   # Escherichia coli (strain K12)
+}
+
+MAX_GENE_RESULTS = 5
 
 
 class UniProtError(Exception):
@@ -56,6 +73,91 @@ def fetch_by_accession(accession: str) -> ProteinSequence:
     return protein
 
 
+def fetch_by_gene(gene: str, organism: str = "human"
+                  ) -> list[ProteinSequence]:
+    """Search UniProt for proteins made by <gene> in <organism>.
+
+    Only reviewed (Swiss-Prot) entries are returned, because they are
+    checked by curators. Returns at most MAX_GENE_RESULTS proteins, best
+    match first.
+
+    Raises:
+        UniProtError: If the gene name or organism is invalid, nothing
+            matches, or UniProt can't be reached.
+    """
+    gene = gene.strip()
+    # Gene names only use letters, numbers, '-', '_' and '.'.
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", gene):
+        raise UniProtError(f"'{gene}' is not a valid gene name.")
+
+    taxonomy_id = organism_to_taxonomy_id(organism)
+    query = (f"gene_exact:{gene} AND organism_id:{taxonomy_id} "
+             "AND reviewed:true")
+    params = urllib.parse.urlencode(
+        {"query": query, "format": "fasta", "size": MAX_GENE_RESULTS}
+    )
+    text = _download(f"{BASE_URL}/search?{params}")
+
+    if not text.strip():
+        raise UniProtError(
+            f"No reviewed UniProt entry found for gene '{gene}' "
+            f"in organism '{organism}'."
+        )
+
+    proteins = []
+    for protein in parse_fasta_safely(text):
+        protein.name = short_name(protein.name)
+        proteins.append(protein)
+    if not proteins:
+        raise UniProtError(f"Can't analyze any protein for gene '{gene}'.")
+    return proteins
+
+
+def organism_to_taxonomy_id(organism: str) -> int:
+    """Return the NCBI taxonomy ID for a common name or a numeric ID.
+
+    >>> organism_to_taxonomy_id("Mouse")
+    10090
+    >>> organism_to_taxonomy_id("9913")
+    9913
+    """
+    organism = organism.strip().lower()
+    if organism.isdigit():
+        return int(organism)
+    if organism in ORGANISMS:
+        return ORGANISMS[organism]
+    raise UniProtError(
+        f"Unknown organism '{organism}'. Use one of: "
+        f"{', '.join(ORGANISMS)}, or a taxonomy ID number."
+    )
+
+
+def parse_fasta_safely(text: str) -> list[ProteinSequence]:
+    """Parse FASTA text, skipping records this tool can't analyze.
+
+    For example, proteins with selenocysteine (U) are skipped instead of
+    stopping the whole search.
+    """
+    proteins = []
+    record = ""
+    for line in text.splitlines(keepends=True):
+        if line.startswith(">") and record:
+            proteins.extend(_try_parse(record))
+            record = ""
+        record += line
+    if record:
+        proteins.extend(_try_parse(record))
+    return proteins
+
+
+def _try_parse(record: str) -> list[ProteinSequence]:
+    """Return the protein in one FASTA record, or [] if it can't be parsed."""
+    try:
+        return parse_fasta(record)
+    except ValueError:
+        return []
+
+
 def short_name(header: str) -> str:
     """Turn a long UniProt FASTA header into a readable name.
 
@@ -80,7 +182,8 @@ def _download(url: str) -> str:
             return response.read().decode("utf-8")
     except urllib.error.HTTPError as error:
         if error.code in (400, 404):
-            raise UniProtError("No protein found with that accession.") from error
+            raise UniProtError(
+                "No protein found. Check the ID or gene name.") from error
         raise UniProtError(
             f"UniProt returned an error (HTTP {error.code}). Try again later."
         ) from error

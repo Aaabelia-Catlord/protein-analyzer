@@ -7,12 +7,17 @@ still pass when you're offline or UniProt is down.
 
 import io
 import urllib.error
+import urllib.parse
 
 import pytest
 
 from protein_analyzer import uniprot
 from protein_analyzer.cli import main
-from protein_analyzer.uniprot import UniProtError, fetch_by_accession
+from protein_analyzer.uniprot import (
+    UniProtError,
+    fetch_by_accession,
+    fetch_by_gene,
+)
 
 # A real response from https://rest.uniprot.org/uniprotkb/P01308.fasta
 INSULIN_FASTA = (
@@ -105,3 +110,81 @@ def test_cli_uniprot(fake_download: list[str],
 def test_cli_uniprot_error(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--uniprot", "not-an-id"]) == 1
     assert "not a valid" in capsys.readouterr().err
+
+
+# ---------- fetch_by_gene ----------
+
+def test_gene_search_url(fake_download: list[str]) -> None:
+    fetch_by_gene("INS")
+    url = fake_download[0]
+    assert url.startswith("https://rest.uniprot.org/uniprotkb/search?")
+    # The query is URL-encoded, so decode it before checking.
+    query = urllib.parse.unquote_plus(url)
+    assert "gene_exact:INS" in query
+    assert "organism_id:9606" in query   # human is the default
+    assert "reviewed:true" in query
+
+
+def test_gene_search_other_organism(fake_download: list[str]) -> None:
+    fetch_by_gene("Ins1", organism="mouse")
+    assert "organism_id:10090" in urllib.parse.unquote_plus(fake_download[0])
+
+
+def test_gene_search_taxonomy_id(fake_download: list[str]) -> None:
+    fetch_by_gene("INS", organism="9913")
+    assert "organism_id:9913" in urllib.parse.unquote_plus(fake_download[0])
+
+
+def test_gene_search_returns_proteins(fake_download: list[str]) -> None:
+    proteins = fetch_by_gene("INS")
+    assert len(proteins) == 1
+    assert proteins[0].name == "Insulin (P01308, Homo sapiens)"
+
+
+def test_unknown_organism(fake_download: list[str]) -> None:
+    with pytest.raises(UniProtError, match="Unknown organism"):
+        fetch_by_gene("INS", organism="dragon")
+    assert fake_download == []
+
+
+def test_invalid_gene_name(fake_download: list[str]) -> None:
+    with pytest.raises(UniProtError, match="not a valid gene"):
+        fetch_by_gene("INS AND 1=1")
+    assert fake_download == []
+
+
+def test_gene_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    # UniProt returns an empty page when nothing matches.
+    monkeypatch.setattr(uniprot, "_download", lambda url: "")
+    with pytest.raises(UniProtError, match="No reviewed UniProt entry"):
+        fetch_by_gene("NOTAREALGENE")
+
+
+def test_gene_search_skips_unsupported_proteins(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    two_records = ">sp|P1|SEL Selenoprotein\nMUA\n" + INSULIN_FASTA
+    monkeypatch.setattr(uniprot, "_download", lambda url: two_records)
+    proteins = fetch_by_gene("INS")
+    assert [p.name for p in proteins] == ["Insulin (P01308, Homo sapiens)"]
+
+
+def test_cli_gene(fake_download: list[str],
+                  capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--gene", "INS"]) == 0
+    assert "Insulin" in capsys.readouterr().out
+
+
+def test_cli_gene_multiple_matches(monkeypatch: pytest.MonkeyPatch,
+                                   capsys: pytest.CaptureFixture[str]) -> None:
+    other = ">sp|P2|OTHER Other protein OS=Homo sapiens\nGG\n"
+    two_records = INSULIN_FASTA + other
+    monkeypatch.setattr(uniprot, "_download", lambda url: two_records)
+    assert main(["--gene", "INS"]) == 0
+    output = capsys.readouterr()
+    assert "Insulin" in output.out
+    assert "1 other match" in output.err
+
+
+def test_cli_organism_without_gene(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["GG", "--organism", "mouse"]) == 1
+    assert "--organism only works with --gene" in capsys.readouterr().err
